@@ -20,6 +20,7 @@ import '../sentry_native_binding.dart';
 import '../sentry_native_invoker.dart';
 import 'binding.dart' as binding;
 import 'utils.dart';
+import 'windows_library_loader.dart';
 
 @internal
 class SentryNative with SentryNativeSafeInvoker implements SentryNativeBinding {
@@ -45,11 +46,7 @@ class SentryNative with SentryNativeSafeInvoker implements SentryNativeBinding {
 
   SentryNative(this.options);
 
-  // Tracks whether this binding auto-initialized the native SDK, so close() -
-  // which may now be called even when crash handling was never enabled, see
-  // #3960 - doesn't touch the `native` binding (and so trigger its lazy
-  // DynamicLibrary.open) for the first time on a binding that was never
-  // initialized.
+  // close() must not load the native library when crash handling was disabled.
   bool _nativeSdkAutoInitialized = false;
 
   /// Completes once a background `sentry_init()` has returned.
@@ -119,7 +116,8 @@ class SentryNative with SentryNativeSafeInvoker implements SentryNativeBinding {
 
   static Future<void> _loadLibraryOnHelperIsolate(String libraryPath) =>
       Isolate.run(() {
-        DynamicLibrary.open(libraryPath);
+        WindowsLibraryLoader(DynamicLibrary.open('kernel32.dll'))
+            .load(libraryPath);
       });
 
   void _checkInitResult(int code) {
